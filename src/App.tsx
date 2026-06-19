@@ -20,11 +20,13 @@ import "./annotations.css";
 import "./App.css";
 import {
   acquireRoom,
+  ANNOTATIONS_ARRAY,
   createFile,
   deleteFile,
   docRoom,
   getLocalUser,
   getRoom,
+  LOCAL_ORIGIN,
   renameFile,
   releaseRoom,
   useFiles,
@@ -46,10 +48,6 @@ interface StoredAnnotation {
   className?: string;
   comment?: string;
 }
-
-// Origin tag for Yjs transactions we initiate, so the observer can ignore its
-// own echoes and avoid an apply -> write -> apply loop.
-const LOCAL_ORIGIN = { source: "annotation-sync" };
 
 const COLORS = [
   { label: "Yellow", className: "annotation-yellow" },
@@ -261,7 +259,7 @@ const AnnotationSync: React.FC<{ doc: Y.Doc }> = ({ doc }) => {
   // again whenever a remote peer changes them.
   useEffect(() => {
     if (!contentReady) return;
-    const arr = doc.getArray<StoredAnnotation>("annotations");
+    const arr = doc.getArray<StoredAnnotation>(ANNOTATIONS_ARRAY);
     const stored = arr.toArray();
     lastSynced.current = normalize(stored);
     setAnnotations(
@@ -278,7 +276,7 @@ const AnnotationSync: React.FC<{ doc: Y.Doc }> = ({ doc }) => {
   }, [contentReady, remoteRev]);
 
   useEffect(() => {
-    const arr = doc.getArray<StoredAnnotation>("annotations");
+    const arr = doc.getArray<StoredAnnotation>(ANNOTATIONS_ARRAY);
     const observer = (e: Y.YArrayEvent<StoredAnnotation>) => {
       if (e.transaction.origin === LOCAL_ORIGIN) return; // ignore our echoes
       setRemoteRev((v) => v + 1);
@@ -306,7 +304,7 @@ const AnnotationSync: React.FC<{ doc: Y.Doc }> = ({ doc }) => {
     if (ser === lastSynced.current) return; // unchanged since last sync
     lastSynced.current = ser;
     queueMicrotask(() => {
-      const arr = doc.getArray<StoredAnnotation>("annotations");
+      const arr = doc.getArray<StoredAnnotation>(ANNOTATIONS_ARRAY);
       if (normalize(arr.toArray()) === ser) return;
       doc.transact(() => {
         arr.delete(0, arr.length);
