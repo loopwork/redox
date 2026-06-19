@@ -20,16 +20,10 @@ import {
   STORE_DIR,
   coldLoad,
   flush,
-  roomToFileId,
   type CommitAuthor,
 } from "./store";
 import { startIndexSync, type IndexSync } from "./index-sync";
-
-// Wire-level names mirrored from src/collab/constants.ts.
-// That client module can't be imported here (it references `window` /
-// `import.meta.env`), so the server keeps its own copy; both sides agree on the
-// literal "redox:index" so the unchanged client reads what the server publishes.
-const INDEX_ROOM = "redox:index";
+import { INDEX_ROOM, roomToFileId } from "../src/shared/protocol";
 
 const PORT = Number(process.env.PORT ?? 1234);
 const DATA_DIR = process.env.YDATA_DIR ?? "./data";

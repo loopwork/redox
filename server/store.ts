@@ -26,25 +26,13 @@ import {
   type AnchoredAnnotation,
   type OffsetAnnotation,
 } from "./anchoring";
-
-// Wire-level Yjs key, mirrored from src/collab/constants.ts (ANNOTATIONS_ARRAY).
-// That client file can't be imported here because it touches `window` /
-// `import.meta.env`, which don't exist under the server's Node tsconfig; the two
-// must stay in sync (both hard-code "annotations", the y-prosemirror convention
-// the client relies on).
-const ANNOTATIONS_ARRAY = "annotations";
+import { ANNOTATIONS_ARRAY } from "../src/shared/protocol";
 
 // Store root: its own git repo. Configurable via REDOX_STORE_DIR (default
 // ./store, resolved against the process cwd).
 export const STORE_DIR = path.resolve(
   process.env.REDOX_STORE_DIR ?? "./store",
 );
-
-// Room name <-> file id (relative path) translation.
-const DOC_PREFIX = "redox:doc:";
-export function roomToFileId(room: string): string | null {
-  return room.startsWith(DOC_PREFIX) ? room.slice(DOC_PREFIX.length) : null;
-}
 
 // Map a file id to its on-disk paths. The id already carries `.md`.
 function mdPathFor(id: string): string {
@@ -205,7 +193,7 @@ export function coldLoad(doc: Y.Doc, id: string, origin: unknown): boolean {
 // flush: Y.Doc -> disk
 // ---------------------------------------------------------------------------
 function pmNodeFromYDoc(doc: Y.Doc) {
-  const json = yDocToProsemirrorJSON(doc, "prosemirror");
+  const json = yDocToProsemirrorJSON(doc, PM_FRAGMENT);
   return getSchema().nodeFromJSON(json as Record<string, unknown>);
 }
 

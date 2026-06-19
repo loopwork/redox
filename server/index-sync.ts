@@ -33,15 +33,7 @@ import {
   isFileId,
   type CommitAuthor,
 } from "./store";
-
-// Mirrored from src/collab/constants.ts + src/collab/files.ts (those client
-// modules reference window / import.meta.env and can't be imported server-side).
-const FILES_MAP = "files";
-interface FileMeta {
-  id: string;
-  name: string;
-  createdAt: number;
-}
+import { FILES_MAP, type FileMeta } from "../src/shared/protocol";
 
 const PUBLISH_DEBOUNCE_MS = 200; // coalesce bursts of fs events
 const RESCAN_INTERVAL_MS = 5_000; // safety net if fs.watch misses an event

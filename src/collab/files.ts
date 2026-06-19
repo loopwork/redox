@@ -2,14 +2,8 @@
 // React binding so the sidebar re-renders when files are added/renamed/removed.
 import { useSyncExternalStore } from "react";
 import * as Y from "yjs";
-import { INDEX_ROOM, FILES_MAP } from "./constants";
+import { INDEX_ROOM, FILES_MAP, type FileMeta } from "./constants";
 import { acquireRoom } from "./rooms";
-
-export interface FileMeta {
-  id: string;
-  name: string;
-  createdAt: number;
-}
 
 // The index connection lives for the whole app session; never released.
 let indexConn: ReturnType<typeof acquireRoom> | null = null;
