@@ -1,73 +1,64 @@
-# React + TypeScript + Vite
+# redox
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A multi-file, collaborative rich-text editor with side-note annotations.
+Documents are stored on a server and edited in real time over [Yjs](https://yjs.dev/);
+multiple people can open the same file (via its URL) and see each other's edits
+and cursors live.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Editor** — [Remirror](https://remirror.io/) (ProseMirror) with the WYSIWYG
+  preset, the annotation extension, and `@remirror/extension-yjs` for real-time sync.
+- **Collaboration** — Yjs documents synced over WebSocket. Document content,
+  annotations, and the file list are all CRDTs, so they merge without conflicts.
+- **Server** — a small TypeScript Yjs WebSocket server (`server/index.ts`) that
+  persists every document to LevelDB on disk.
 
-## React Compiler
+## Run
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev        # starts the web app (Vite) AND the collab server together
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open the printed Vite URL. Create a file with **+ New**, then share the URL
+(including the `#<file-id>` hash) — anyone who opens it joins the same live session.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Individual processes, if you want them separately:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev:web    # Vite only (http://localhost:5173)
+npm run server     # collab server only (ws://localhost:1234)
 ```
+
+Server config via env vars: `PORT` (default `1234`), `YDATA_DIR` (default `./data`,
+git-ignored). The web app connects to `ws://<host>:1234` by default; override with
+`VITE_WS_URL`.
+
+## How it fits together
+
+- `server/index.ts` — Yjs WebSocket server. One URL path = one Yjs document
+  ("room"). Rooms are loaded from LevelDB on first connect and unloaded when the
+  last client leaves; all updates are persisted.
+- `src/collab.ts` — client connection layer. Reference-counted room connections,
+  the shared **file index** (`redox:index`, a collaborative `Y.Map` of files),
+  file CRUD, and the local user identity used for awareness cursors.
+- `src/App.tsx` — UI. A file sidebar, the active file in the URL hash, and the
+  per-file editor. `AnnotationSync` mirrors annotations between the editor and the
+  file's Yjs document so they persist and sync alongside the text.
+
+### Rooms
+
+| Room              | Holds                                                |
+| ----------------- | ---------------------------------------------------- |
+| `redox:index`     | `Y.Map` of `{ id, name, createdAt }` — the file list |
+| `redox:doc:<id>`  | one file: ProseMirror content + `annotations` array  |
+
+## Notes & limitations
+
+- Annotation positions are stored as absolute offsets. Under simultaneous edits
+  to the same region they can briefly drift, then self-heal once the documents
+  converge — fine for iterating, not a hardened concurrent-annotation model.
+- No auth: anyone who can reach the server and knows a file id can edit it.
+- The `data/` LevelDB directory is the source of truth for persistence; delete it
+  to reset all documents.

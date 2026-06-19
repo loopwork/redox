@@ -4,30 +4,42 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k -n web,server -c blue,green \"npm run dev:web\" \"npm run server\"",
+    "dev:web": "vite",
+    "server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@remirror/extension-yjs": "^4.0.3",
     "@remirror/react": "^3.0.3",
     "@remirror/react-editors": "^2.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "remirror": "^3.0.3"
+    "remirror": "^3.0.3",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.3",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "lib0": "^0.2.117",
+    "tsx": "^4.22.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "ws": "^8.21.0",
+    "y-leveldb": "^0.2.0",
+    "y-protocols": "^1.0.7"
   }
 }

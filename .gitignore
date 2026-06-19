@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Yjs server persistence (LevelDB)
+data
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
