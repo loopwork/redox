@@ -1,9 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { wysiwygPreset, MarkdownExtension } from "remirror/extensions";
-import {
-  AnnotationExtension,
-  type Annotation,
-} from "@remirror/extension-annotation";
+import { AnnotationExtension } from "@remirror/extension-annotation";
 import { YjsExtension } from "@remirror/extension-yjs";
 import {
   Remirror,
@@ -14,40 +11,24 @@ import {
   useHelpers,
   useRemirrorContext,
 } from "@remirror/react";
-import * as Y from "yjs";
+import type { Doc } from "yjs";
 import "@remirror/styles/all.css";
 import "./annotations.css";
 import "./App.css";
 import {
   acquireRoom,
-  ANNOTATIONS_ARRAY,
   createFile,
   deleteFile,
   docRoom,
   getLocalUser,
   getRoom,
-  LOCAL_ORIGIN,
   renameFile,
   releaseRoom,
   useFiles,
   type FileMeta,
 } from "./collab";
-
-// Extend the base Annotation with our own fields. AnnotationExtension is
-// generic over this type, so commands/helpers carry `comment` through.
-interface MyAnnotation extends Annotation {
-  className?: string;
-  comment?: string;
-}
-
-// Positional shape we persist into Yjs (text is recomputed from the document).
-interface StoredAnnotation {
-  id: string;
-  from: number;
-  to: number;
-  className?: string;
-  comment?: string;
-}
+import { useAnnotationSync } from "./annotations/useAnnotationSync";
+import type { MyAnnotation } from "./annotations/types";
 
 const COLORS = [
   { label: "Yellow", className: "annotation-yellow" },
@@ -213,106 +194,10 @@ const FileEditor: React.FC<{ file: FileMeta }> = ({ file }) => {
   );
 };
 
-// Order-independent serialization of an annotation set, for change detection.
-const normalize = (xs: StoredAnnotation[]) =>
-  JSON.stringify(
-    [...xs]
-      .map((a) => ({
-        id: a.id,
-        from: a.from,
-        to: a.to,
-        className: a.className,
-        comment: a.comment,
-      }))
-      .sort((a, b) => a.id.localeCompare(b.id)),
-  );
-
-// Two-way sync of annotations through the file's Yjs document. The two
-// directions use different mechanisms on purpose:
-//
-//   Yjs -> editor (READ): a reactive effect. Annotation ranges only resolve
-//     once the Yjs content has rendered into the editor (content size > 2 ==
-//     more than one empty paragraph), since y-prosemirror applies remote
-//     content a tick after the Yjs update. Running setAnnotations from an effect
-//     (not from within an update listener) dispatches a clean transaction, so
-//     dependents like SideNotes re-render.
-//
-//   editor -> Yjs (WRITE): an imperative update listener that reads FRESH state.
-//     A render-captured snapshot can be stale exactly when content arrives, so
-//     reading via the listener's `helpers` avoids clobbering stored data. The
-//     `restored` guard ensures we never write the empty pre-restore state.
-//
-// Positions are absolute; under simultaneous edits they self-heal on convergence.
-const AnnotationSync: React.FC<{ doc: Y.Doc }> = ({ doc }) => {
-  const { setAnnotations } = useCommands();
-  const { view } = useRemirrorContext({ autoUpdate: true });
-  const contentReady = view.state.doc.content.size > 2;
-  const restored = useRef(false);
-  // Bumped by remote (non-local) changes to re-run the read effect.
-  const [remoteRev, setRemoteRev] = useState(0);
-  // Serialized value of the last set we read from or wrote to Yjs. Both
-  // directions compare against this so a stable state never re-syncs — which is
-  // what keeps the editor<->Yjs binding from feeding back on itself.
-  const lastSynced = useRef<string>("");
-
-  // READ: mirror stored annotations into the editor once content is ready, and
-  // again whenever a remote peer changes them.
-  useEffect(() => {
-    if (!contentReady) return;
-    const arr = doc.getArray<StoredAnnotation>(ANNOTATIONS_ARRAY);
-    const stored = arr.toArray();
-    lastSynced.current = normalize(stored);
-    setAnnotations(
-      stored.map((a) => ({
-        id: a.id,
-        from: a.from,
-        to: a.to,
-        className: a.className,
-        comment: a.comment,
-      })) as Parameters<typeof setAnnotations>[0],
-    );
-    restored.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentReady, remoteRev]);
-
-  useEffect(() => {
-    const arr = doc.getArray<StoredAnnotation>(ANNOTATIONS_ARRAY);
-    const observer = (e: Y.YArrayEvent<StoredAnnotation>) => {
-      if (e.transaction.origin === LOCAL_ORIGIN) return; // ignore our echoes
-      setRemoteRev((v) => v + 1);
-    };
-    arr.observe(observer);
-    return () => arr.unobserve(observer);
-  }, [doc]);
-
-  // WRITE: on every editor update, read fresh annotations and push changes.
-  // Deferred to a microtask so the Yjs write happens OUTSIDE ProseMirror's
-  // dispatch stack — y-prosemirror re-dispatches editor transactions on doc
-  // updates, and writing inline would recurse. The lastSynced guard then stops
-  // a stable state from looping.
-  useRemirrorContext((props) => {
-    if (!restored.current) return; // wait for the initial restore
-    const fresh = props.helpers.getAnnotations() as MyAnnotation[];
-    const next: StoredAnnotation[] = fresh.map((a) => ({
-      id: a.id,
-      from: a.from,
-      to: a.to,
-      className: a.className,
-      comment: a.comment,
-    }));
-    const ser = normalize(next);
-    if (ser === lastSynced.current) return; // unchanged since last sync
-    lastSynced.current = ser;
-    queueMicrotask(() => {
-      const arr = doc.getArray<StoredAnnotation>(ANNOTATIONS_ARRAY);
-      if (normalize(arr.toArray()) === ser) return;
-      doc.transact(() => {
-        arr.delete(0, arr.length);
-        arr.insert(0, next);
-      }, LOCAL_ORIGIN);
-    });
-  });
-
+// Mount point for the annotation <-> Yjs sync. The logic lives in the hook; this
+// component just runs it inside the Remirror provider.
+const AnnotationSync: React.FC<{ doc: Doc }> = ({ doc }) => {
+  useAnnotationSync(doc);
   return null;
 };
 
