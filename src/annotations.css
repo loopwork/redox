@@ -1,0 +1,11 @@
+/* Custom annotation colors, applied via the Annotation `className` field.
+   Overlapping annotations multiply, naturally darkening shared spans. */
+.annotation-yellow {
+  background: rgba(255, 214, 0, 0.4);
+}
+.annotation-green {
+  background: rgba(0, 200, 83, 0.35);
+}
+.annotation-pink {
+  background: rgba(255, 64, 129, 0.3);
+}
