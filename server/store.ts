@@ -1,17 +1,14 @@
-// Git-backed file store (SERVER-ONLY): files are the source of truth.
+// Document store operations (SERVER-ONLY): files are the source of truth.
 //
 // On-disk layout (the store root is its own git repo):
 //   <root>/<path>.md                  document content as markdown
 //   <root>/<path>.annotations.json    sidecar: array of anchored annotations
 //
-// A document's "id" is its relative path with the .md extension (e.g.
-// "notes/architecture.md"); the corresponding room name is "redox:doc:<path>".
-// This module owns ALL filesystem + git + anchor-translation logic so the live
-// Yjs server (server/index.ts) only deals with Y.Docs.
+// This module turns a live Y.Doc into those files and back (cold-load / flush),
+// scans the store for the file index, and reflects client index CRUD onto disk.
+// Path/id math lives in ./paths; git plumbing in ./git.
 import fs from "node:fs";
-import fsp from "node:fs/promises";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import * as Y from "yjs";
 import { yDocToProsemirrorJSON } from "y-prosemirror";
 import { getSchema } from "../src/editor/schema";
@@ -27,137 +24,37 @@ import {
   type OffsetAnnotation,
 } from "./anchoring";
 import { ANNOTATIONS_ARRAY } from "../src/shared/protocol";
-
-// Store root: its own git repo. Configurable via REDOX_STORE_DIR (default
-// ./store, resolved against the process cwd).
-export const STORE_DIR = path.resolve(
-  process.env.REDOX_STORE_DIR ?? "./store",
-);
-
-// Map a file id to its on-disk paths. The id already carries `.md`.
-function mdPathFor(id: string): string {
-  return path.join(STORE_DIR, id);
-}
-function annotationsPathFor(id: string): string {
-  // notes/x.md -> notes/x.annotations.json
-  const base = id.endsWith(".md") ? id.slice(0, -".md".length) : id;
-  return path.join(STORE_DIR, `${base}.annotations.json`);
-}
-
-// Guard against path traversal: the resolved file must stay under STORE_DIR.
-function assertInsideStore(p: string): void {
-  const rel = path.relative(STORE_DIR, p);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) {
-    throw new Error(`refusing to access path outside store: ${p}`);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// git
-// ---------------------------------------------------------------------------
-function git(args: string[]): { ok: boolean; out: string } {
-  const res = spawnSync("git", args, {
-    cwd: STORE_DIR,
-    encoding: "utf8",
-  });
-  return {
-    ok: res.status === 0,
-    out: `${res.stdout ?? ""}${res.stderr ?? ""}`.trim(),
-  };
-}
-
-let gitInitialized = false;
-// Ensure STORE_DIR exists and is a git repo. Idempotent; cheap after first run.
-export function ensureStoreRepo(): void {
-  if (gitInitialized) return;
-  fs.mkdirSync(STORE_DIR, { recursive: true });
-  if (!fs.existsSync(path.join(STORE_DIR, ".git"))) {
-    git(["init", "-q"]);
-    // Local identity so commits succeed even on a machine with no global git
-    // user configured (CI, fresh containers). Harmless if already set.
-    git(["config", "user.email", "redox@localhost"]);
-    git(["config", "user.name", "redox"]);
-  }
-  gitInitialized = true;
-}
-
-// Identity of the user a commit should be attributed to. Derived server-side
-// from Yjs awareness (the client broadcasts { user: { name, color } }); we only
-// use the name and synthesize a local-only email so git is happy.
-export interface CommitAuthor {
-  name: string;
-  email?: string;
-}
-
-const DEFAULT_AUTHOR: CommitAuthor = {
-  name: "redox",
-  email: "redox@localhost",
-};
-
-function authorEnv(author?: CommitAuthor): NodeJS.ProcessEnv | undefined {
-  const a = author && author.name ? author : undefined;
-  if (!a) return undefined;
-  // Sanitize the display name into something git accepts; fall back if empty.
-  const name = a.name.replace(/[\n\r<>]/g, "").trim() || DEFAULT_AUTHOR.name;
-  const email =
-    a.email && /^[^\s<>]+@[^\s<>]+$/.test(a.email)
-      ? a.email
-      : // Synthesize a stable, local-only address from the display name.
-        `${name.replace(/\s+/g, ".").toLowerCase()}@redox.local`;
-  return {
-    ...process.env,
-    GIT_AUTHOR_NAME: name,
-    GIT_AUTHOR_EMAIL: email,
-    GIT_COMMITTER_NAME: name,
-    GIT_COMMITTER_EMAIL: email,
-  };
-}
-
-function commit(
-  paths: string[],
-  message: string,
-  author?: CommitAuthor,
-): boolean {
-  git(["add", "--", ...paths]);
-  // Only commit if there is something staged (avoids empty-commit errors).
-  const status = git(["status", "--porcelain"]);
-  if (status.out === "") return false;
-  const env = authorEnv(author);
-  const res = spawnSync("git", ["commit", "-q", "-m", message], {
-    cwd: STORE_DIR,
-    encoding: "utf8",
-    env,
-  });
-  return res.status === 0;
-}
+import {
+  STORE_DIR,
+  mdPathFor,
+  annotationsPathFor,
+  assertInsideStore,
+  isFileId,
+  nameToFileId,
+  toFileId,
+} from "./paths";
+import { git, ensureStoreRepo, commit, type CommitAuthor } from "./git";
 
 // ---------------------------------------------------------------------------
 // cold-load: disk -> Y.Doc
 // ---------------------------------------------------------------------------
 // Seed an EXISTING Y.Doc (the live WSSharedDoc) from the on-disk markdown +
-// annotations sidecar for `id`. If no markdown file exists the doc is left empty
-// (today's behavior). `origin` tags the seed transaction(s) so the server's
-// persist/broadcast handlers can recognize them.
+// annotations sidecar for `id`. If no markdown file exists the doc is left empty.
+// `origin` tags the seed transaction(s) so the server's handlers recognize them.
 //
 // CONCURRENCY: cold-load runs asynchronously after the room is created, so a
-// client may have already synced its state (or made an edit) into the live doc
-// before we get here. Seeding disk content on top of that does NOT clobber it —
-// y-prosemirror merges the two XmlFragments, producing duplicated/interleaved
-// content (disk text + the live edit jammed together). To avoid corrupting the
-// live session we treat an already-populated fragment as authoritative: the
-// live room wins and will be flushed back to disk. Cold-load only seeds a doc
-// whose content fragment is still empty (the normal first-open case).
+// client may have already synced state (or made an edit) into the live doc.
+// Seeding disk content on top of that would merge two XmlFragments and corrupt
+// the session, so we treat an already-populated fragment as authoritative: the
+// live room wins and is flushed back to disk. Cold-load only seeds an empty doc.
 //
-// Returns true if disk content was actually seeded (the doc was empty), false
-// if seeding was skipped because a live session already had content.
+// Returns true if disk content was seeded, false if skipped (live content / no file).
 export function coldLoad(doc: Y.Doc, id: string, origin: unknown): boolean {
   const mdPath = mdPathFor(id);
   assertInsideStore(mdPath);
   if (!fs.existsSync(mdPath)) return false; // no file: empty doc
 
-  // If a client already populated the content fragment during the async load
-  // window, do NOT seed from disk — that would merge disk + live content and
-  // corrupt the session. The live edits are canonical; flush will persist them.
+  // A client populated the fragment during the async load window: don't merge.
   if (doc.getXmlFragment(PM_FRAGMENT).length > 0) return false;
 
   const md = fs.readFileSync(mdPath, "utf8");
@@ -212,14 +109,11 @@ export function flush(doc: Y.Doc, id: string, author?: CommitAuthor): boolean {
   try {
     md = yDocToMarkdown(doc);
     const node = pmNodeFromYDoc(doc);
-    const offsets = doc
-      .getArray<OffsetAnnotation>(ANNOTATIONS_ARRAY)
-      .toArray();
+    const offsets = doc.getArray<OffsetAnnotation>(ANNOTATIONS_ARRAY).toArray();
     anchors = offsetsToAnchors(node, offsets);
   } catch (err) {
     // Serialization can throw if the doc contains a node with no markdown
-    // mapping (e.g. task list / iframe — see step-1 issues). Don't lose the
-    // room; skip this flush and let a later edit retry.
+    // mapping. Don't lose the room; skip this flush and let a later edit retry.
     console.error(`flush: failed to serialize ${id}:`, err);
     return false;
   }
@@ -228,11 +122,10 @@ export function flush(doc: Y.Doc, id: string, author?: CommitAuthor): boolean {
   fs.mkdirSync(path.dirname(annPath), { recursive: true });
 
   // Markdown: ensure a single trailing newline (POSIX text file convention).
-  const mdOut = md.endsWith("\n") ? md : `${md}\n`;
-  fs.writeFileSync(mdPath, mdOut, "utf8");
+  fs.writeFileSync(mdPath, md.endsWith("\n") ? md : `${md}\n`, "utf8");
 
-  // Annotations sidecar: write it when there are annotations; remove a stale
-  // sidecar when the last annotation is gone so disk stays in sync.
+  // Annotations sidecar: write when present; remove a stale sidecar once the
+  // last annotation is gone so disk stays in sync.
   const writtenPaths = [mdPath];
   if (anchors.length > 0) {
     fs.writeFileSync(annPath, `${JSON.stringify(anchors, null, 2)}\n`, "utf8");
@@ -244,17 +137,6 @@ export function flush(doc: Y.Doc, id: string, author?: CommitAuthor): boolean {
 
   commit(writtenPaths, `redox: update ${id}`, author);
   return true;
-}
-
-// Async variant used on graceful paths; mkdir/write/commit are fast enough that
-// the sync version above is the workhorse, but expose this for parity.
-export async function flushAsync(
-  doc: Y.Doc,
-  id: string,
-  author?: CommitAuthor,
-): Promise<boolean> {
-  await fsp.mkdir(STORE_DIR, { recursive: true });
-  return flush(doc, id, author);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +165,6 @@ export function scanFiles(): ScannedFile[] {
       if (e.isDirectory()) {
         walk(full);
       } else if (e.isFile() && e.name.endsWith(".md")) {
-        const id = path.relative(STORE_DIR, full).split(path.sep).join("/");
         let createdAt = Date.now();
         try {
           createdAt = fs.statSync(full).mtimeMs;
@@ -291,7 +172,7 @@ export function scanFiles(): ScannedFile[] {
           /* keep default */
         }
         out.push({
-          id,
+          id: toFileId(full),
           name: e.name.slice(0, -".md".length),
           createdAt,
         });
@@ -306,36 +187,7 @@ export function scanFiles(): ScannedFile[] {
 // filesystem mutations (reflecting client index CRUD onto disk + git)
 // ---------------------------------------------------------------------------
 // The client edits the redox:index files Y.Map; the server mirrors safe changes
-// to the git-backed store. All of these are guarded against path traversal and
-// only ever touch paths inside STORE_DIR.
-
-// True if `id` looks like a path-keyed file id (what the server publishes),
-// rather than the client's UUID. UUIDs never contain "/" or end in ".md".
-export function isFileId(id: string): boolean {
-  return id.endsWith(".md");
-}
-
-// Turn an arbitrary display name into a safe relative *.md path. Strips path
-// separators and unsafe characters so a name can never escape the store or
-// collide with the annotations sidecar suffix.
-export function nameToFileId(name: string, dir = ""): string {
-  // Drop path separators and the chars illegal on common filesystems,
-  // collapse whitespace, and strip our reserved suffixes. Never emits "/"
-  // so the result cannot escape STORE_DIR. Control chars and the
-  // Windows-reserved set are removed; letters, digits, spaces are kept.
-  const cleaned = name
-    .replace(/[\\/]+/g, "-") // no nested dirs from a display name
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f<>:"|?*]+/g, "") // control + fs-illegal chars
-    .replace(/\s+/g, " ") // collapse whitespace runs
-    .trim()
-    .replace(/\.annotations$/i, "") // avoid clashing with sidecar naming
-    .replace(/\.md$/i, "")
-    .trim();
-  const base = cleaned || "Untitled";
-  const rel = dir ? `${dir.replace(/\/+$/, "")}/${base}.md` : `${base}.md`;
-  return rel;
-}
+// to the git-backed store. All are guarded against path traversal (assertInsideStore).
 
 // Pick an unused file id near `id` by appending " 2", " 3", ... before .md.
 function uniqueFileId(id: string): string {
@@ -351,7 +203,10 @@ function uniqueFileId(id: string): string {
 
 // Create an empty markdown file for a new client-created entry. Returns the
 // (possibly de-duplicated) file id actually created, or null on failure.
-export function createEmptyFile(name: string, author?: CommitAuthor): string | null {
+export function createEmptyFile(
+  name: string,
+  author?: CommitAuthor,
+): string | null {
   ensureStoreRepo();
   const id = uniqueFileId(nameToFileId(name));
   const mdPath = mdPathFor(id);
@@ -400,9 +255,7 @@ export function renameStoreFile(
     if (fs.existsSync(oldAnn)) {
       assertInsideStore(oldAnn);
       assertInsideStore(newAnn);
-      const oldAnnRel = path.relative(STORE_DIR, oldAnn).split(path.sep).join("/");
-      const newAnnRel = path.relative(STORE_DIR, newAnn).split(path.sep).join("/");
-      if (!git(["mv", "--", oldAnnRel, newAnnRel]).ok) {
+      if (!git(["mv", "--", toFileId(oldAnn), toFileId(newAnn)]).ok) {
         fs.renameSync(oldAnn, newAnn);
       }
       moved.push(oldAnn, newAnn);
@@ -431,8 +284,7 @@ export function deleteStoreFile(id: string, author?: CommitAuthor): boolean {
       removed.push(mdPath);
     }
     if (fs.existsSync(annPath)) {
-      const annRel = path.relative(STORE_DIR, annPath).split(path.sep).join("/");
-      if (!git(["rm", "-q", "--", annRel]).ok) fs.rmSync(annPath);
+      if (!git(["rm", "-q", "--", toFileId(annPath)]).ok) fs.rmSync(annPath);
       removed.push(annPath);
     }
     if (removed.length === 0) return false;

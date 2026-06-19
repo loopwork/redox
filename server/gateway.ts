@@ -15,7 +15,8 @@
 import * as Y from "yjs";
 import { LeveldbPersistence } from "y-leveldb";
 import { INDEX_ROOM, roomToFileId } from "../src/shared/protocol";
-import { coldLoad, flush, type CommitAuthor } from "./store";
+import { coldLoad, flush } from "./store";
+import type { CommitAuthor } from "./git";
 import { startIndexSync, type IndexSync } from "./index-sync";
 import type { WSSharedDoc } from "./index";
 

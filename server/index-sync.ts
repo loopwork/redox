@@ -25,14 +25,13 @@
 import fs from "node:fs";
 import * as Y from "yjs";
 import {
-  STORE_DIR,
   scanFiles,
   createEmptyFile,
   renameStoreFile,
   deleteStoreFile,
-  isFileId,
-  type CommitAuthor,
 } from "./store";
+import { STORE_DIR, isFileId } from "./paths";
+import type { CommitAuthor } from "./git";
 import { FILES_MAP, type FileMeta } from "../src/shared/protocol";
 
 const PUBLISH_DEBOUNCE_MS = 200; // coalesce bursts of fs events

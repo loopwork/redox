@@ -15,7 +15,7 @@ import * as syncProtocol from "y-protocols/sync";
 import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
-import { STORE_DIR } from "./store";
+import { STORE_DIR } from "./paths";
 import { DocGateway, DATA_DIR, WAL_ENABLED } from "./gateway";
 
 const PORT = Number(process.env.PORT ?? 1234);
