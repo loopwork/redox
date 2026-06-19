@@ -40,12 +40,18 @@ git-ignored). The web app connects to `ws://<host>:1234` by default; override wi
 - `server/index.ts` — Yjs WebSocket server. One URL path = one Yjs document
   ("room"). Rooms are loaded from LevelDB on first connect and unloaded when the
   last client leaves; all updates are persisted.
-- `src/collab.ts` — client connection layer. Reference-counted room connections,
-  the shared **file index** (`redox:index`, a collaborative `Y.Map` of files),
-  file CRUD, and the local user identity used for awareness cursors.
-- `src/App.tsx` — UI. A file sidebar, the active file in the URL hash, and the
-  per-file editor. `AnnotationSync` mirrors annotations between the editor and the
-  file's Yjs document so they persist and sync alongside the text.
+- `src/collab/` — client collaboration layer:
+  - `constants.ts` — WS URL, room builders, Yjs shared-type keys, `LOCAL_ORIGIN`
+  - `rooms.ts` — reference-counted room connection pool
+  - `files.ts` — the collaborative file index (`redox:index`) + `useFiles`
+  - `user.ts` — local user identity for awareness cursors
+- `src/annotations/` — annotation `types` and `useAnnotationSync`, the two-way
+  editor↔Yjs sync so annotations persist and sync alongside the text.
+- `src/editor/extensions.ts` — the Remirror extension stack for a file.
+- `src/components/` — UI: `Sidebar`, `FileEditor`, `AnnotationToolbar`,
+  `SideNotes`, `EmptyState`.
+- `src/hooks/useActiveFile.ts` — active file selection, backed by the URL hash.
+- `src/App.tsx` — thin shell composing the sidebar with the active file's editor.
 
 ### Rooms
 
