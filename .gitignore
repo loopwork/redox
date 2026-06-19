@@ -25,3 +25,6 @@ data
 *.njsproj
 *.sln
 *.sw?
+
+# Default REDOX_STORE_DIR (knowledge store is normally an external repo)
+store
