@@ -36,6 +36,14 @@ import {
 } from "./paths";
 import { git, ensureStoreRepo, commit, type CommitAuthor } from "./git";
 
+// Sanity bounds on a single document. A note is never legitimately this large;
+// a value far above it signals corruption (e.g. a CRDT-merge duplication loop).
+// They gate the two synchronous, event-loop-blocking operations — parsing on
+// cold-load (bytes) and serializing on flush (top-level block count) — so one
+// pathological document can't wedge the whole server.
+const MAX_DOC_BYTES = 2_000_000; // ~2 MB of markdown
+const MAX_DOC_BLOCKS = 10_000; // top-level blocks in the ProseMirror fragment
+
 // ---------------------------------------------------------------------------
 // cold-load: disk -> Y.Doc
 // ---------------------------------------------------------------------------
@@ -57,6 +65,18 @@ export function coldLoad(doc: Y.Doc, id: string, origin: unknown): boolean {
 
   // A client populated the fragment during the async load window: don't merge.
   if (doc.getXmlFragment(PM_FRAGMENT).length > 0) return false;
+
+  // Corruption guard: a note is never legitimately this large. Parsing a huge
+  // markdown blob synchronously would block the event loop, so refuse it and
+  // leave the doc empty rather than wedge the server.
+  const size = fs.statSync(mdPath).size;
+  if (size > MAX_DOC_BYTES) {
+    console.error(
+      `coldLoad: refusing to parse ${id}: ${size} bytes exceeds ` +
+        `${MAX_DOC_BYTES} (likely corruption); leaving doc empty`,
+    );
+    return false;
+  }
 
   const md = fs.readFileSync(mdPath, "utf8");
   // 1) content: markdown -> prosemirror fragment in the live doc.
@@ -104,6 +124,20 @@ export function flush(doc: Y.Doc, id: string, author?: CommitAuthor): boolean {
   const annPath = annotationsPathFor(id);
   assertInsideStore(mdPath);
   assertInsideStore(annPath);
+
+  // Corruption guard (cheap, O(1): XmlFragment.length is the child count). A
+  // real note never has this many top-level blocks; a count far above it means
+  // corruption (historically a CRDT-merge duplication). Refuse to serialize it —
+  // that would block the event loop on a huge synchronous render and persist the
+  // bad document over the file.
+  const blocks = doc.getXmlFragment(PM_FRAGMENT).length;
+  if (blocks > MAX_DOC_BLOCKS) {
+    console.error(
+      `flush: refusing to serialize ${id}: ${blocks} top-level blocks exceeds ` +
+        `${MAX_DOC_BLOCKS} (likely corruption); skipping flush`,
+    );
+    return false;
+  }
 
   let md: string;
   let anchors: AnchoredAnnotation[];
