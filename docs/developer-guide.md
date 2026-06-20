@@ -71,7 +71,7 @@ Client (`src/`):
 
 ## 3. Identity is the path
 
-A document's **id is its store-relative path, including** `.md` — e.g. `docs/proposals/t3.md`. There is no separate UUID, no id-to-path mapping table.
+A document's **id is its store-relative path, including** `.md` — e.g. `notes/architecture.md`. There is no separate UUID, no id-to-path mapping table.
 
 - The room for a document is `redox:doc:<id>` (`docRoom` in [protocol.ts](../src/shared/protocol.ts)).
 - The on-disk file is `<store>/<id>` and its annotations sidecar is `<store>/<id-without-.md>.annotations.json` ([paths.ts](../server/paths.ts)).
@@ -242,4 +242,4 @@ The integration test (`server/coldload-reconnect.itest.mjs`) is the regression t
 - **Concurrent annotations** to the same region can briefly drift before self-healing (section 6) — not a hardened model.
 - **Task-list checkbox state** does not round-trip through markdown: a GFM task list re-parses as a plain bullet list (text preserved, checkbox lost). See the serializer note in [markdown-serializer.ts](../src/editor/markdown-serializer.ts).
 - **Flush is synchronous** (serialize + git). For normal-sized notes this is fine; the size guards (section 5) keep a pathological document from wedging the loop, but a *legitimately* large document would still pause it briefly.
-- The `docs/proposals/` directory holds design notes (e.g. the file-identity proposal that motivated the path-id model); they are background, not authoritative — this guide is.
+- **`anchoring.ts` exports `buildTextMap`** with no external caller; it could be made private.
