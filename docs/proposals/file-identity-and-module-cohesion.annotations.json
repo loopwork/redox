@@ -1,13 +1,5 @@
 [
   {
-    "id": "0e71dd8d-6fdc-42b9-b2f6-2c6828fd9e53",
-    "quote": "scussion Context: md-json-gateway branch. Not shipped — no users, no on-disk data to migrate, no legacy clients. We can change anything. Lens: Simple Made Easy (Hicke",
-    "prefix": "on notes)\nStatus: draft / for di",
-    "suffix": "y) — prefer the design with the ",
-    "posHint": 102,
-    "className": "annotation-yellow"
-  },
-  {
     "id": "130e4032-a6a8-4292-8b1e-6a0d4f294678",
     "quote": "index-sync UUID→path reconciliation dance, orphan files, the stranded editor, and every \"fix\" we sketched (migrate the editor, a create-handshake, a uuid↔path map) — is incidental complexity that exists only because two ids are braided together",
     "prefix": "ything painful downstream — the ",
