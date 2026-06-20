@@ -26,7 +26,7 @@ import fs from "node:fs";
 import * as Y from "yjs";
 import {
   scanFiles,
-  createEmptyFile,
+  ensureFile,
   renameStoreFile,
   deleteStoreFile,
 } from "./store";
@@ -145,7 +145,7 @@ export function startIndexSync(
 
     for (const [key, change] of event.keys) {
       try {
-        reflectChange(doc, map, key, change, author, serverOrigin);
+        reflectChange(map, key, change, author);
       } catch (err) {
         console.error(`index reflect failed for ${key}:`, err);
       }
@@ -166,20 +166,19 @@ export function startIndexSync(
   };
 }
 
-// Apply a single map-key change to the filesystem, where safe. `serverOrigin`
-// is used for the cleanup write that removes a throwaway UUID create entry.
+// Apply a single map-key change to the filesystem, where safe. Keys are always
+// path ids now (the client derives them via the shared nameToFileId), so there
+// is no UUID reconciliation — an add just ensures the backing file exists.
 function reflectChange(
-  doc: Y.Doc,
   map: Y.Map<FileMeta>,
   key: string,
   change: { action: "add" | "update" | "delete"; oldValue: FileMeta },
   author: CommitAuthor | undefined,
-  serverOrigin: unknown,
 ): void {
+  if (!isFileId(key)) return; // ignore non-path keys (shouldn't occur)
+
   if (change.action === "delete") {
-    // A path-keyed entry removed by the client -> remove the backing file.
-    // (UUID-keyed deletes are our own cleanup or have no backing file.)
-    if (isFileId(key)) deleteStoreFile(key, author);
+    deleteStoreFile(key, author);
     return;
   }
 
@@ -187,29 +186,15 @@ function reflectChange(
   if (!meta) return;
 
   if (change.action === "add") {
-    if (isFileId(key)) {
-      // The client added a path-keyed entry directly (unusual). Treat it as a
-      // request to create that file if missing; scanFiles/publish will own it.
-      createEmptyFile(meta.name || key, author);
-      return;
-    }
-    // Client create flow: a UUID-keyed { id, name, createdAt } entry. Create an
-    // empty .md from the name, then drop the throwaway UUID entry so the map
-    // converges to the path-keyed id the rescan publishes.
-    const newId = createEmptyFile(meta.name, author);
-    if (newId) {
-      doc.transact(() => {
-        if (map.get(key)) map.delete(key);
-      }, serverOrigin);
-    }
+    // Client created a file at this path: materialize it so it persists even
+    // before the user types (the rescan would otherwise drop an un-backed entry).
+    ensureFile(key, author);
     return;
   }
 
-  // action === "update": a display-name change on a path-keyed entry -> rename.
-  if (change.action === "update" && isFileId(key)) {
-    const prevName = change.oldValue?.name;
-    if (meta.name && meta.name !== prevName) {
-      renameStoreFile(key, meta.name, author);
-    }
+  // action === "update": a display-name change -> rename the backing file.
+  const prevName = change.oldValue?.name;
+  if (meta.name && meta.name !== prevName) {
+    renameStoreFile(key, meta.name, author);
   }
 }

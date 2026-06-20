@@ -6,6 +6,9 @@
 // "notes/architecture.md"); the room name is "redox:doc:<id>".
 import path from "node:path";
 
+// Name->id derivation is shared with the client (one definition, no drift).
+export { nameToFileId, uniqueFileId } from "../src/shared/protocol";
+
 // Store root: its own git repo. Configurable via REDOX_STORE_DIR (default
 // ./store, resolved against the process cwd).
 export const STORE_DIR = path.resolve(process.env.REDOX_STORE_DIR ?? "./store");
@@ -40,19 +43,3 @@ export function isFileId(id: string): boolean {
   return id.endsWith(".md");
 }
 
-// Turn an arbitrary display name into a safe relative *.md path. Strips path
-// separators and unsafe characters so a name can never escape the store or
-// collide with the annotations sidecar suffix.
-export function nameToFileId(name: string, dir = ""): string {
-  const cleaned = name
-    .replace(/[\\/]+/g, "-") // no nested dirs from a display name
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\x00-\x1f<>:"|?*]+/g, "") // control + fs-illegal chars
-    .replace(/\s+/g, " ") // collapse whitespace runs
-    .trim()
-    .replace(/\.annotations$/i, "") // avoid clashing with sidecar naming
-    .replace(/\.md$/i, "")
-    .trim();
-  const base = cleaned || "Untitled";
-  return dir ? `${dir.replace(/\/+$/, "")}/${base}.md` : `${base}.md`;
-}

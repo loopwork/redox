@@ -8,6 +8,8 @@ export {
   DOC_PREFIX,
   docRoom,
   roomToFileId,
+  nameToFileId,
+  uniqueFileId,
   FILES_MAP,
   ANNOTATIONS_ARRAY,
   type FileMeta,

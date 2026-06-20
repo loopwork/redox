@@ -31,6 +31,7 @@ import {
   assertInsideStore,
   isFileId,
   nameToFileId,
+  uniqueFileId,
   toFileId,
 } from "./paths";
 import { git, ensureStoreRepo, commit, type CommitAuthor } from "./git";
@@ -189,36 +190,25 @@ export function scanFiles(): ScannedFile[] {
 // The client edits the redox:index files Y.Map; the server mirrors safe changes
 // to the git-backed store. All are guarded against path traversal (assertInsideStore).
 
-// Pick an unused file id near `id` by appending " 2", " 3", ... before .md.
-function uniqueFileId(id: string): string {
-  if (!fs.existsSync(mdPathFor(id))) return id;
-  const dir = path.posix.dirname(id) === "." ? "" : path.posix.dirname(id);
-  const base = path.posix.basename(id, ".md");
-  for (let n = 2; n < 1000; n++) {
-    const candidate = dir ? `${dir}/${base} ${n}.md` : `${base} ${n}.md`;
-    if (!fs.existsSync(mdPathFor(candidate))) return candidate;
-  }
-  return id;
-}
+// Does a file id already exist in the store? (Predicate for uniqueFileId.)
+const idExists = (id: string): boolean => fs.existsSync(mdPathFor(id));
 
-// Create an empty markdown file for a new client-created entry. Returns the
-// (possibly de-duplicated) file id actually created, or null on failure.
-export function createEmptyFile(
-  name: string,
-  author?: CommitAuthor,
-): string | null {
+// Ensure an empty markdown file exists at exactly `id` (the path the client
+// already chose, deduped client-side). No-op if it exists. The client owns id
+// selection now, so the server creates the file it was told to — it does not
+// re-derive or dedup here.
+export function ensureFile(id: string, author?: CommitAuthor): void {
+  if (!isFileId(id)) return;
   ensureStoreRepo();
-  const id = uniqueFileId(nameToFileId(name));
   const mdPath = mdPathFor(id);
   try {
     assertInsideStore(mdPath);
+    if (fs.existsSync(mdPath)) return;
     fs.mkdirSync(path.dirname(mdPath), { recursive: true });
-    if (!fs.existsSync(mdPath)) fs.writeFileSync(mdPath, "", "utf8");
+    fs.writeFileSync(mdPath, "", "utf8");
     commit([mdPath], `redox: create ${id}`, author);
-    return id;
   } catch (err) {
-    console.error(`createEmptyFile failed for ${name}:`, err);
-    return null;
+    console.error(`ensureFile failed for ${id}:`, err);
   }
 }
 
@@ -234,7 +224,7 @@ export function renameStoreFile(
   const oldMd = mdPathFor(id);
   if (!fs.existsSync(oldMd)) return null;
   const dir = path.posix.dirname(id) === "." ? "" : path.posix.dirname(id);
-  const newId = uniqueFileId(nameToFileId(newName, dir));
+  const newId = uniqueFileId(nameToFileId(newName, dir), idExists);
   if (newId === id) return null; // no actual change
   const newMd = mdPathFor(newId);
   try {

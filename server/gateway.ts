@@ -15,6 +15,7 @@
 import * as Y from "yjs";
 import { LeveldbPersistence } from "y-leveldb";
 import { INDEX_ROOM, roomToFileId } from "../src/shared/protocol";
+import { isFileId } from "./paths";
 import { coldLoad, flush } from "./store";
 import type { CommitAuthor } from "./git";
 import { startIndexSync, type IndexSync } from "./index-sync";
@@ -73,7 +74,10 @@ export class DocGateway {
 
   constructor(doc: WSSharedDoc, onUnload: () => void) {
     this.doc = doc;
-    this.fileId = roomToFileId(doc.name);
+    // A room is file-backed iff its id is a path (".md"). Invariant guardrail:
+    // a malformed/non-path room can never write a bare orphan file.
+    const id = roomToFileId(doc.name);
+    this.fileId = id && isFileId(id) ? id : null;
     this.onUnload = onUnload;
     this.loadComplete = new Promise<void>((resolve) => {
       this.resolveLoad = resolve;

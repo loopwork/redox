@@ -2,7 +2,13 @@
 // React binding so the sidebar re-renders when files are added/renamed/removed.
 import { useSyncExternalStore } from "react";
 import * as Y from "yjs";
-import { INDEX_ROOM, FILES_MAP, type FileMeta } from "./constants";
+import {
+  INDEX_ROOM,
+  FILES_MAP,
+  nameToFileId,
+  uniqueFileId,
+  type FileMeta,
+} from "./constants";
 import { acquireRoom } from "./rooms";
 
 // The index connection lives for the whole app session; never released.
@@ -13,12 +19,14 @@ function filesMap(): Y.Map<FileMeta> {
 }
 
 export function createFile(name: string): FileMeta {
-  const meta: FileMeta = {
-    id: crypto.randomUUID(),
-    name: name.trim() || "Untitled",
-    createdAt: Date.now(),
-  };
-  filesMap().set(meta.id, meta);
+  const display = name.trim() || "Untitled";
+  const map = filesMap();
+  // Identity IS the path: derive it (shared with the server, so they agree) and
+  // dedupe against the files we already know about. No UUID, no reconciliation —
+  // the room the editor opens is the canonical path room from the first keystroke.
+  const id = uniqueFileId(nameToFileId(display), (candidate) => map.has(candidate));
+  const meta: FileMeta = { id, name: display, createdAt: Date.now() };
+  map.set(id, meta);
   return meta;
 }
 
