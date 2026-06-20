@@ -1,0 +1,10 @@
+[
+  {
+    "id": "dca3f405-2a75-4243-9dcd-f6c5ba6c1450",
+    "quote": "this phrase",
+    "prefix": "Select ",
+    "suffix": " to annotate it.",
+    "posHint": 8,
+    "className": "annotation-yellow"
+  }
+]
