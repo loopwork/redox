@@ -245,5 +245,6 @@ The integration test (`server/coldload-reconnect.itest.mjs`) is the regression t
 - **No auth** (section 10).
 - **Concurrent annotations** to the same region can briefly drift before self-healing (section 6) — not a hardened model.
 - **Task-list checkbox state** does not round-trip through markdown: a GFM task list re-parses as a plain bullet list (text preserved, checkbox lost). See the serializer note in [markdown-serializer.ts](../src/editor/markdown-serializer.ts).
+- **Marks on code spans and links are dropped** (section 4): the `code` and `link` marks both set `excludes: "_"` (Remirror defaults), so emphasis combined with inline code or a link is lost on the round-trip. Lifting it is a small schema change — override those two marks' `excludes` so bold/italic can coexist — but verify the serializer emits the nested marks correctly (e.g. `**` outside the backticks / link). Left as the default for now since plain code and plain link text are defensible.
 - **Flush is synchronous** (serialize + git). For normal-sized notes this is fine; the size guards (section 5) keep a pathological document from wedging the loop, but a *legitimately* large document would still pause it briefly.
 - **Unused export:** `anchoring.ts`'s `buildTextMap` has no external caller and could be made private.
