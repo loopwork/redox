@@ -1,4 +1,8 @@
-import { wysiwygPreset, MarkdownExtension } from "remirror/extensions";
+import {
+  wysiwygPreset,
+  MarkdownExtension,
+  TableExtension,
+} from "remirror/extensions";
 
 // The content/schema-defining extension stack, shared by the client editor and
 // the headless server schema. This is the single source of truth for which
@@ -21,6 +25,9 @@ import { wysiwygPreset, MarkdownExtension } from "remirror/extensions";
 export function buildContentExtensions() {
   return [
     ...wysiwygPreset({}),
+    // Tables: adds the table/tableRow/tableCell/tableHeaderCell nodes. The
+    // markdown bridge (editor/markdown.ts) round-trips these to GFM pipe tables.
+    new TableExtension({}),
     new MarkdownExtension({ copyAsMarkdown: false }),
   ];
 }

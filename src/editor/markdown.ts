@@ -61,17 +61,40 @@ function underlineHtmlPlugin(md: MarkdownIt): void {
   });
 }
 
+// GFM tables: prosemirror-tables cells hold block content (`block+`), but
+// markdown-it emits a cell's content as a bare `inline` token between th/td
+// open+close. Wrap that inline run in paragraph_open/paragraph_close tokens so
+// the parser builds tableCell > paragraph > inline (a valid cell).
+function tableCellParagraphPlugin(md: MarkdownIt): void {
+  md.core.ruler.push("redox_table_cell_paragraphs", (state: StateCore) => {
+    const out: (typeof state.tokens)[number][] = [];
+    for (const tok of state.tokens) {
+      if (tok.type === "th_open" || tok.type === "td_open") {
+        out.push(tok, new state.Token("paragraph_open", "p", 1));
+      } else if (tok.type === "th_close" || tok.type === "td_close") {
+        out.push(new state.Token("paragraph_close", "p", -1), tok);
+      } else {
+        out.push(tok);
+      }
+    }
+    state.tokens = out;
+    return false;
+  });
+}
+
 function buildTokenizer(): MarkdownIt {
   // html:true lets the <u> underline tokens through; underlineHtmlPlugin then
   // narrows raw HTML handling to only the underline mark.
   const md = MarkdownIt("commonmark", { html: true });
-  // CommonMark preset disables strikethrough; re-enable it for the strike mark.
-  md.enable(["strikethrough"]);
+  // CommonMark preset disables strikethrough + tables; re-enable both (strike
+  // mark, GFM pipe tables).
+  md.enable(["strikethrough", "table"]);
   // Disable the block-level HTML rule so a line that is just <u>..</u> is parsed
   // as a paragraph (its <u> becoming an inline-HTML token we handle) rather than
   // an opaque html_block the ProseMirror parser has no mapping for.
   md.disable(["html_block"]);
   md.use(underlineHtmlPlugin);
+  md.use(tableCellParagraphPlugin);
   return md;
 }
 
@@ -112,6 +135,14 @@ function buildParser(): MarkdownParser {
       getAttrs: (tok) => ({ language: tok.info || "" }),
       noCloseToken: true,
     },
+    // GFM tables. thead/tbody have no ProseMirror counterpart (a table is just
+    // rows), so they're ignored; cells were paragraph-wrapped by the tokenizer.
+    table: { block: "table" },
+    thead: { ignore: true },
+    tbody: { ignore: true },
+    tr: { block: "tableRow" },
+    th: { block: "tableHeaderCell" },
+    td: { block: "tableCell" },
     hr: { node: "horizontalRule" },
     image: {
       node: "image",
@@ -179,6 +210,16 @@ function isPlainURL(link: Mark, parent: PMNode, index: number): boolean {
 // reuse the same convention via a loosely typed alias.
 type SerState = MarkdownSerializerState & { inAutolink?: boolean };
 
+// Render one table cell's content to a single GFM cell: reuse the full
+// serializer (so marks like bold/code/links survive) on the cell's block
+// content, then flatten to one line — GFM cells can't span lines — and escape
+// pipes so they don't break the column structure.
+function cellToMarkdown(cell: PMNode): string {
+  const doc = getSchema().node("doc", null, cell.content);
+  const md = getSerializer().serialize(doc, { tightLists: true });
+  return md.replace(/\s*\n+\s*/g, " ").replace(/\|/g, "\\|").trim() || " ";
+}
+
 function buildSerializer(): MarkdownSerializer {
   return new MarkdownSerializer(
     {
@@ -203,6 +244,31 @@ function buildSerializer(): MarkdownSerializer {
       horizontalRule(state, node) {
         state.write((node.attrs.markup as string) || "---");
         state.closeBlock(node);
+      },
+      table(state, node) {
+        // Render the whole grid here; the first row is treated as the header,
+        // followed by the GFM separator row. tableRow/cell handlers below exist
+        // only so the serializer never sees an unmapped node.
+        node.forEach((row, _off, ri) => {
+          state.write("|");
+          row.forEach((cell) => state.write(` ${cellToMarkdown(cell)} |`));
+          state.write("\n");
+          if (ri === 0) {
+            state.write("|");
+            for (let c = 0; c < row.childCount; c++) state.write(" --- |");
+            state.write("\n");
+          }
+        });
+        state.closeBlock(node);
+      },
+      tableRow(state, node) {
+        state.renderContent(node);
+      },
+      tableCell(state, node) {
+        state.renderContent(node);
+      },
+      tableHeaderCell(state, node) {
+        state.renderContent(node);
       },
       bulletList(state, node) {
         // Default to "-" (the most common bullet convention); honor an explicit
