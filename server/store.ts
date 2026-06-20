@@ -149,38 +149,46 @@ export interface ScannedFile {
   createdAt: number; // mtime in ms (stable-ish ordering for the sidebar)
 }
 
-// Recursively scan STORE_DIR for *.md files (excluding *.annotations.json).
+// Scan the store for *.md files (excluding *.annotations.json).
+//
+// We ask git rather than walking the tree ourselves so .gitignore is honored:
+//   --cached            files already tracked (staged/committed)
+//   --others            untracked files (so brand-new docs show up pre-commit)
+//   --exclude-standard  apply .gitignore / .git/info/exclude / global excludes
+//   -z                  NUL-separated output (paths with spaces stay intact)
+// This keeps ignored trees (e.g. a node_modules/ with its own READMEs) out of
+// the index. git emits POSIX, repo-relative paths, which already ARE file ids.
 export function scanFiles(): ScannedFile[] {
   ensureStoreRepo();
+  const res = git([
+    "ls-files",
+    "--cached",
+    "--others",
+    "--exclude-standard",
+    "-z",
+    "--",
+    "*.md",
+  ]);
+  // git failed: report an empty index rather than fall back to an unfiltered
+  // walk that would reintroduce ignored files.
+  if (!res.ok) {
+    console.error(`scanFiles: git ls-files failed: ${res.out}`);
+    return [];
+  }
+
   const out: ScannedFile[] = [];
-  const walk = (dir: string): void => {
-    let entries: fs.Dirent[];
+  const seen = new Set<string>();
+  for (const id of res.out.split("\0")) {
+    if (!id.endsWith(".md") || seen.has(id)) continue;
+    seen.add(id);
+    let createdAt: number;
     try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
+      createdAt = fs.statSync(path.join(STORE_DIR, id)).mtimeMs;
     } catch {
-      return;
+      continue; // listed but absent on disk (e.g. staged delete): skip
     }
-    for (const e of entries) {
-      if (e.name === ".git") continue;
-      const full = path.join(dir, e.name);
-      if (e.isDirectory()) {
-        walk(full);
-      } else if (e.isFile() && e.name.endsWith(".md")) {
-        let createdAt = Date.now();
-        try {
-          createdAt = fs.statSync(full).mtimeMs;
-        } catch {
-          /* keep default */
-        }
-        out.push({
-          id: toFileId(full),
-          name: e.name.slice(0, -".md".length),
-          createdAt,
-        });
-      }
-    }
-  };
-  walk(STORE_DIR);
+    out.push({ id, name: path.posix.basename(id, ".md"), createdAt });
+  }
   return out.sort((a, b) => a.createdAt - b.createdAt);
 }
 
