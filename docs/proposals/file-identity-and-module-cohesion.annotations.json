@@ -5,6 +5,7 @@
     "prefix": "ch. Not shipped — no users, no o",
     "suffix": "ists. \"Simple\" = un-braided (one",
     "posHint": 172,
-    "className": "annotation-yellow"
+    "className": "annotation-yellow",
+    "comment": "test"
   }
 ]
