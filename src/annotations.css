@@ -1,5 +1,9 @@
 /* Custom annotation colors, applied via the Annotation `className` field.
+   Every annotation carries one of these; lavender is the default highlight.
    Overlapping annotations multiply, naturally darkening shared spans. */
+.annotation-lavender {
+  background: rgba(120, 120, 255, 0.25);
+}
 .annotation-yellow {
   background: rgba(255, 214, 0, 0.4);
 }

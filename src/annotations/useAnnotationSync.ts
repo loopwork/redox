@@ -14,6 +14,9 @@ const normalize = (xs: StoredAnnotation[]): string =>
         to: a.to,
         className: a.className,
         comment: a.comment,
+        author: a.author,
+        createdAt: a.createdAt,
+        replies: a.replies,
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
@@ -24,6 +27,9 @@ const toStored = (a: MyAnnotation): StoredAnnotation => ({
   to: a.to,
   className: a.className,
   comment: a.comment,
+  author: a.author,
+  createdAt: a.createdAt,
+  replies: a.replies,
 });
 
 // Two-way sync of annotations through the file's Yjs document. Must be called
@@ -69,8 +75,13 @@ export function useAnnotationSync(doc: Doc): void {
         id: a.id,
         from: a.from,
         to: a.to,
-        className: a.className,
+        // Every annotation is colored; default a legacy class-less one to
+        // lavender so it stays visible (and self-migrates on the next write).
+        className: a.className ?? "annotation-lavender",
         comment: a.comment,
+        author: a.author,
+        createdAt: a.createdAt,
+        replies: a.replies,
       })) as Parameters<typeof setAnnotations>[0],
     );
     restored.current = true;
