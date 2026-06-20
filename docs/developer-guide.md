@@ -101,6 +101,10 @@ The bridge between them lives in `src/editor/` and is **pure string/JSON logic, 
 
 Why not reuse prosemirror-markdown's defaults or Remirror's own markdown helpers: the defaults target a different schema (different node names), and Remirror's helpers go markdown → HTML → ProseMirror via the DOM, which doesn't exist in Node. prosemirror-markdown + markdown-it are pure string code, so the same bridge runs in the browser and on the server.
 
+**Round-trip normalization (expected, not data loss).** The bridge preserves *content*, not byte-for-byte formatting. The serializer emits the schema's **canonical** markdown — notably **one line per paragraph**: in CommonMark a single newline inside a paragraph is a soft break (a space), and a ProseMirror paragraph has no notion of wrap columns, so hard-wrapping inside a paragraph is collapsed. The practical effect: opening a hand-wrapped markdown file and saving it **reflows each paragraph to a single line, once**. It is idempotent after that — a second save makes no further change — and the text, headings, lists, code blocks, and tables are identical. So a freshly authored file may show a one-time reflow in its first auto-save; that is the document settling into canonical form, not drift.
+
+One genuine fidelity limit hides in that normalization: the `code` and `link` marks each **exclude all other marks** (the Remirror default — inline code is plain monospace and link text is plain), so emphasis combined with a code span or a link is not representable in the model and is dropped on the round-trip. Valid markdown like `` **`x`** `` or `**[x](url)**` saves back without the bold. Lifting this would mean overriding those two marks' `excludes`. Everything that does not put another mark on a code span or a link round-trips faithfully.
+
 ---
 
 ## 5. The document lifecycle (and its data-loss invariants)
@@ -242,4 +246,4 @@ The integration test (`server/coldload-reconnect.itest.mjs`) is the regression t
 - **Concurrent annotations** to the same region can briefly drift before self-healing (section 6) — not a hardened model.
 - **Task-list checkbox state** does not round-trip through markdown: a GFM task list re-parses as a plain bullet list (text preserved, checkbox lost). See the serializer note in [markdown-serializer.ts](../src/editor/markdown-serializer.ts).
 - **Flush is synchronous** (serialize + git). For normal-sized notes this is fine; the size guards (section 5) keep a pathological document from wedging the loop, but a *legitimately* large document would still pause it briefly.
-- **`anchoring.ts` exports `buildTextMap`** with no external caller; it could be made private.
+- **Unused export:** `anchoring.ts`'s `buildTextMap` has no external caller and could be made private.
