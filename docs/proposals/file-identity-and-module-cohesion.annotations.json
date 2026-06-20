@@ -21,6 +21,32 @@
     "prefix": "(twisting two things together).\n",
     "suffix": "\n1.1 Root cause (stated as compl",
     "posHint": 483,
+    "className": "annotation-lavender",
+    "comment": "no need for annotate buttom"
+  },
+  {
+    "id": "130e4032-a6a8-4292-8b1e-6a0d4f294678",
+    "quote": "index-sync UUID→path reconciliation dance, orphan files, the stranded editor, and every \"fix\" we sketched (migrate the editor, a create-handshake, a uuid↔path map) — is incidental complexity that exists only because two ids are braided together",
+    "prefix": "ything painful downstream — the ",
+    "suffix": ". The UUID is a vestige of the o",
+    "posHint": 839,
+    "className": "annotation-green"
+  },
+  {
+    "id": "07b4760c-2f68-4d42-a4b6-b00c6e1aba30",
+    "quote": "iscussion Context: md-json-gateway branch. Not shipped — no users, no on-disk data to migrate, no legacy clients. We can change anything. Lens: Simple Made Easy (Hickey) — prefer the design with the fewest interleaved concepts, even if a more",
+    "prefix": "ion notes)\nStatus: draft / for d",
+    "suffix": " familiar/convenient one exists.",
+    "posHint": 101,
+    "className": "annotation-pink"
+  },
+  {
+    "id": "b61cde9a-9bd1-421f-ad24-a43012ffae05",
+    "quote": "1. The file-identity seam",
+    "prefix": "(twisting two things together).\n",
+    "suffix": "\n1.1 Root cause (stated as compl",
+    "posHint": 483,
+    "className": "annotation-lavender",
     "comment": "no need for annotate buttom"
   }
 ]
