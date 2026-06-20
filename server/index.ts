@@ -135,7 +135,17 @@ function onMessage(conn: WebSocket, doc: WSSharedDoc, data: Uint8Array): void {
     switch (type) {
       case messageSync: {
         encoding.writeVarUint(encoder, messageSync);
-        syncProtocol.readSyncMessage(decoder, encoder, doc, conn);
+        const syncType = syncProtocol.readSyncMessage(decoder, encoder, doc, conn);
+        // The client's initial sync (step2/update) has now been applied. Seed the
+        // doc from disk only AFTER this, and only if it's still empty — letting a
+        // reconnecting client's own state arrive first is what prevents the
+        // restart-duplication merge (see server/gateway.ts ensureLoaded).
+        if (
+          syncType === syncProtocol.messageYjsSyncStep2 ||
+          syncType === syncProtocol.messageYjsUpdate
+        ) {
+          void doc.gateway?.ensureLoaded();
+        }
         // Only reply if readSyncMessage wrote a response (length > type byte).
         if (encoding.length(encoder) > 1) {
           send(doc, conn, encoding.toUint8Array(encoder));

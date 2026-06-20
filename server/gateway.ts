@@ -12,6 +12,13 @@
 //     flushed once loaded
 //   - a failed flush keeps the doc live and retries; on last-disconnect the doc
 //     is NOT destroyed until its final flush succeeds
+//   - the disk cold-load is DEFERRED until a connecting client's initial sync
+//     settles, then seeds only if the doc is still empty (ensureLoaded). This is
+//     what stops content from DUPLICATING when the server restarts and a client
+//     reconnects: seeding mints fresh CRDT ids, so merging a seed on top of the
+//     client's retained state would double the document. Letting the client's
+//     state arrive first means the empty-guard skips the seed (and we instead
+//     flush the client's state, recovering any edits made since the last flush).
 import * as Y from "yjs";
 import { LeveldbPersistence } from "y-leveldb";
 import { INDEX_ROOM, roomToFileId } from "../src/shared/protocol";
@@ -65,6 +72,12 @@ export class DocGateway {
   private unloaded = false;
   // Live filesystem<->Y.Map index sync (only for the redox:index room).
   private indexSync: IndexSync | null = null;
+  // Disk cold-load is deferred until a client's initial sync settles
+  // (ensureLoaded); this guards it to run exactly once.
+  private coldLoadDone = false;
+  // Resolves once the optional WAL replay has been applied, so the deferred
+  // cold-load never races ahead of the server's own persisted state.
+  private walReady: Promise<void> = Promise.resolve();
 
   // Resolves when cold-load finishes (success or not) so the disconnect path can
   // await a fully-seeded doc before its final flush — edits that raced the load
@@ -100,38 +113,59 @@ export class DocGateway {
       }
     });
 
-    void (async () => {
+    // Optional WAL replay (the server's own persisted state). Everything that
+    // seeds the doc waits on this so it is never overtaken by the disk cold-load.
+    this.walReady = (async () => {
+      if (!persistence) return;
       try {
-        if (persistence) {
-          const persisted = await persistence.getYDoc(this.doc.name);
-          Y.applyUpdate(
-            this.doc,
-            Y.encodeStateAsUpdate(persisted),
-            WAL_REPLAY_ORIGIN,
-          );
-        }
-        if (this.fileId) {
-          // Document room: seed content + annotations from disk (no-op if absent).
-          try {
-            coldLoad(this.doc, this.fileId, SERVER_ORIGIN);
-          } catch (err) {
-            console.error(`cold-load failed for ${this.doc.name}:`, err);
-          }
-        } else if (this.doc.name === INDEX_ROOM && !this.unloaded) {
-          // Index room: live, bidirectional filesystem <-> Y.Map sync. Guard
-          // against a teardown that raced this async window (would leak a watcher).
-          this.indexSync = startIndexSync(
-            this.doc,
-            SERVER_ORIGIN,
-            () => this.doc.awareness,
-          );
-        }
-      } finally {
-        // Always mark loaded so the disconnect path's await cannot hang and any
-        // buffered edits get a flush attempt.
-        this.markLoaded();
+        const persisted = await persistence.getYDoc(this.doc.name);
+        Y.applyUpdate(
+          this.doc,
+          Y.encodeStateAsUpdate(persisted),
+          WAL_REPLAY_ORIGIN,
+        );
+      } catch (err) {
+        console.error(`WAL replay failed for ${this.doc.name}:`, err);
       }
     })();
+
+    if (this.fileId) {
+      // Document room: DEFER the disk cold-load to ensureLoaded(), triggered once
+      // a connecting client's initial sync has settled (see the invariant note at
+      // the top of this file). markLoaded() therefore happens in ensureLoaded.
+      return;
+    }
+
+    void this.walReady.then(() => {
+      if (this.unloaded) return;
+      // Index room: live, bidirectional filesystem <-> Y.Map sync. (No
+      // client-content race — its state is the filesystem, not a cold-load.)
+      if (this.doc.name === INDEX_ROOM) {
+        this.indexSync = startIndexSync(
+          this.doc,
+          SERVER_ORIGIN,
+          () => this.doc.awareness,
+        );
+      }
+      this.markLoaded();
+    });
+  }
+
+  // Seed a document room from disk — but only once, and only after a connecting
+  // client's initial sync has been applied, so a reconnecting client's own state
+  // wins (coldLoad's empty-guard then skips, avoiding the restart-duplication
+  // merge). Called by the relay after the first syncStep2/update on the room, and
+  // by onLastClientGone as a fallback for a client that never synced.
+  async ensureLoaded(): Promise<void> {
+    if (this.coldLoadDone || !this.fileId) return;
+    this.coldLoadDone = true;
+    await this.walReady; // WAL (if any) is authoritative; apply it first.
+    try {
+      coldLoad(this.doc, this.fileId, SERVER_ORIGIN);
+    } catch (err) {
+      console.error(`cold-load failed for ${this.doc.name}:`, err);
+    }
+    this.markLoaded();
   }
 
   // A client (re)connected — cancel any pending teardown so the now-live doc is
@@ -146,6 +180,10 @@ export class DocGateway {
   // The last client left: flush (awaiting cold-load first) then unload. If a new
   // client reconnects while we wait, attemptFinalFlush aborts the teardown.
   async onLastClientGone(): Promise<void> {
+    // Kick a deferred cold-load that a never-synced client left pending, so the
+    // doc is seeded (loadComplete resolves) before the final flush — otherwise we
+    // could flush an empty doc over the file, or hang awaiting loadComplete.
+    void this.ensureLoaded();
     await this.loadComplete;
     this.attemptFinalFlush();
   }

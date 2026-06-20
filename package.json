@@ -9,6 +9,7 @@
     "server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
     "test": "tsx --test 'server/**/*.test.ts'",
+    "test:integration": "node server/coldload-reconnect.itest.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },
