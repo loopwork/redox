@@ -6,5 +6,13 @@
     "suffix": ". The UUID is a vestige of the o",
     "posHint": 839,
     "className": "annotation-green"
+  },
+  {
+    "id": "07b4760c-2f68-4d42-a4b6-b00c6e1aba30",
+    "quote": "iscussion Context: md-json-gateway branch. Not shipped — no users, no on-disk data to migrate, no legacy clients. We can change anything. Lens: Simple Made Easy (Hickey) — prefer the design with the fewest interleaved concepts, even if a more",
+    "prefix": "ion notes)\nStatus: draft / for d",
+    "suffix": " familiar/convenient one exists.",
+    "posHint": 101,
+    "className": "annotation-pink"
   }
 ]
