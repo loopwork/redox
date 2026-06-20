@@ -7,5 +7,13 @@
     "posHint": 172,
     "className": "annotation-yellow",
     "comment": "test"
+  },
+  {
+    "id": "44773939-59ee-42a9-8598-020289e141bf",
+    "quote": " a vestige of the original localStorage prototype; the gateway already made the path the source of truth. The client just never caught up.",
+    "prefix": "re braided together. The UUID is",
+    "suffix": "\nThe simple move is not to recon",
+    "posHint": 1096,
+    "className": "annotation-green"
   }
 ]
