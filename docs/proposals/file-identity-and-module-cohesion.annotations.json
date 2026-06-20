@@ -1,19 +1,19 @@
 [
   {
     "id": "8ba92be4-c679-4871-a1c3-c6614217eeba",
-    "quote": "n-disk data to migrate, no legacy clients. We can change anything. Lens: Simple Made Easy (Hickey) — prefer the design with the fewest interleaved concepts, even if a more familiar/convenient one ex",
-    "prefix": "ch. Not shipped — no users, no o",
-    "suffix": "ists. \"Simple\" = un-braided (one",
-    "posHint": 172,
+    "quote": "",
+    "prefix": "es, no migration, no handshake.)",
+    "suffix": "",
+    "posHint": 69288,
     "className": "annotation-yellow",
     "comment": "test"
   },
   {
     "id": "44773939-59ee-42a9-8598-020289e141bf",
-    "quote": " a vestige of the original localStorage prototype; the gateway already made the path the source of truth. The client just never caught up.",
-    "prefix": "re braided together. The UUID is",
-    "suffix": "\nThe simple move is not to recon",
-    "posHint": 1096,
+    "quote": "",
+    "prefix": "es, no migration, no handshake.)",
+    "suffix": "",
+    "posHint": 69288,
     "className": "annotation-green",
     "comment": "test"
   }
