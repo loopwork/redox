@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createFile,
   deleteFile,
@@ -42,6 +42,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const user = getLocalUser();
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // ⌘K / Ctrl+K focuses the file search (matches the hint in the field).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const shown = files.filter((f) =>
     f.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -71,9 +86,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.2" />
         </svg>
         <input
+          ref={searchRef}
           value={query}
           placeholder="Search files…"
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter opens the top match (⌘K → type → Enter switches files);
+            // Escape clears and unfocuses.
+            if (e.key === "Enter" && shown[0]) {
+              onSelect(shown[0].id);
+              setQuery("");
+              e.currentTarget.blur();
+            } else if (e.key === "Escape") {
+              setQuery("");
+              e.currentTarget.blur();
+            }
+          }}
         />
         <span className="kbd">⌘K</span>
       </div>
