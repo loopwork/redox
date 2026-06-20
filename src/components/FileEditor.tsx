@@ -18,6 +18,7 @@ import { buildEditorExtensions } from "../editor/extensions";
 import { useAnnotationSync } from "../annotations/useAnnotationSync";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { SideNotes } from "./SideNotes";
+import { TopBar } from "./TopBar";
 
 // Mount point for the annotation <-> Yjs sync. The logic lives in the hook; this
 // runs it inside the Remirror provider.
@@ -48,7 +49,7 @@ export const FileEditor: React.FC<{ file: FileMeta }> = ({ file }) => {
     <div className="editor-wrap">
       <ThemeProvider>
         <Remirror manager={manager} initialContent={state}>
-          <h2 className="doc-title">{file.name}</h2>
+          <TopBar name={file.name} />
           <AnnotationToolbar />
           <div className="editor-row">
             <div className="editor-main">

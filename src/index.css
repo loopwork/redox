@@ -1,18 +1,24 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  --text: #6b6678;
+  --text-h: #1b1822;
+  --text-muted: #9b96a6;
   --bg: #fff;
-  --border: #e5e4e7;
+  --surface: #fafafb;
+  --surface-2: #f4f3f7;
+  --border: #ececef;
+  --border-strong: #e0dfe6;
   --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --accent: #6c5ce0;
+  --accent-strong: #5b4bd6;
+  --accent-bg: rgba(108, 92, 224, 0.09);
+  --accent-border: rgba(108, 92, 224, 0.4);
+  --social-bg: rgba(244, 243, 247, 0.7);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(24, 20, 40, 0.1) 0 10px 24px -8px, rgba(24, 20, 40, 0.06) 0 3px 8px -3px;
+  --shadow-sm: rgba(24, 20, 40, 0.06) 0 1px 2px, rgba(24, 20, 40, 0.04) 0 2px 6px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
@@ -34,15 +40,21 @@
   :root {
     --text: #9ca3af;
     --text-h: #f3f4f6;
+    --text-muted: #6b7280;
     --bg: #16171d;
+    --surface: #1b1c23;
+    --surface-2: #23242d;
     --border: #2e303a;
+    --border-strong: #3a3c47;
     --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
+    --accent: #a78bfa;
+    --accent-strong: #b9a4fb;
+    --accent-bg: rgba(167, 139, 250, 0.16);
+    --accent-border: rgba(167, 139, 250, 0.5);
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+      rgba(0, 0, 0, 0.4) 0 10px 24px -8px, rgba(0, 0, 0, 0.25) 0 3px 8px -3px;
+    --shadow-sm: rgba(0, 0, 0, 0.3) 0 1px 2px, rgba(0, 0, 0, 0.2) 0 2px 6px;
   }
 
   #social .button-icon {
@@ -98,14 +110,29 @@ p {
 code,
 .counter {
   font-family: var(--mono);
-  display: inline-flex;
   border-radius: 4px;
   color: var(--text-h);
 }
+.counter {
+  display: inline-flex;
+}
 
-code {
+/* Inline code only — the boxed pill look. NOT code inside a fenced block
+   (`pre > code`), where the <pre> already owns the background and padding. */
+:not(pre) > code {
+  display: inline-flex;
   font-size: 15px;
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* Code inside a fenced block inherits the <pre>'s styling — no nested box. */
+pre code {
+  display: inline;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }

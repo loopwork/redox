@@ -1,4 +1,4 @@
-/* Multi-file collaborative editor layout. */
+/* Multi-file collaborative editor — redesigned shell (see design mock). */
 
 /* Override the template's centered, fixed-width shell. */
 #root {
@@ -13,51 +13,124 @@
   display: flex;
   min-height: 100svh;
   align-items: stretch;
+  background: var(--bg);
 }
 
-/* --- Sidebar --- */
+/* ------------------------------------------------------------------ Sidebar */
 .sidebar {
-  width: 240px;
-  flex: 0 0 240px;
+  width: 256px;
+  flex: 0 0 256px;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background: var(--surface);
 }
 
 .sidebar-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 14px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 14px 12px;
 }
-.sidebar-head strong {
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.brand-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(150deg, var(--accent), var(--accent-strong));
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-sm);
+}
+.brand strong {
   color: var(--text-h);
+  font-size: 16px;
+  letter-spacing: -0.2px;
 }
-.sidebar-head button {
+.btn-new {
   font-size: 13px;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--accent-bg);
+  font-weight: 500;
+  padding: 5px 11px;
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  background: var(--bg);
   color: var(--accent);
   cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-new:hover {
+  background: var(--accent-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar-search {
+  margin: 2px 12px 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+.sidebar-search:focus-within {
+  border-color: var(--accent-border);
+}
+.search-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex: none;
+}
+.sidebar-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-h);
+}
+.kbd {
+  font-size: 11px;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: var(--surface-2);
+}
+
+.sidebar-section {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .file-list {
   list-style: none;
   margin: 0;
-  padding: 6px;
+  padding: 2px 8px;
   flex: 1;
   overflow-y: auto;
 }
 .file {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 8px;
-  border-radius: 6px;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   color: var(--text);
@@ -68,6 +141,26 @@
 .file.active {
   background: var(--accent-bg);
   color: var(--text-h);
+  font-weight: 500;
+}
+.file.active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+.file-icon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--text-muted);
+}
+.file.active .file-icon {
+  color: var(--accent);
 }
 .file-name {
   flex: 1;
@@ -78,7 +171,7 @@
 }
 .file-actions {
   display: flex;
-  gap: 2px;
+  gap: 1px;
   opacity: 0;
 }
 .file:hover .file-actions,
@@ -89,51 +182,500 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 12px;
-  color: var(--text);
-  padding: 2px 4px;
-  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 3px 5px;
+  border-radius: 5px;
 }
 .file-actions button:hover {
-  background: var(--border);
+  background: var(--bg);
   color: var(--text-h);
 }
 .file-empty {
-  color: var(--text);
+  color: var(--text-muted);
   font-size: 13px;
-  padding: 8px;
-  opacity: 0.6;
+  padding: 10px;
 }
 
 .sidebar-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 9px;
+  padding: 11px 14px;
   border-top: 1px solid var(--border);
   font-size: 13px;
-  color: var(--text);
+  color: var(--text-h);
 }
-.user-dot {
-  width: 10px;
-  height: 10px;
+.avatar {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  display: inline-block;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.user-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foot-gear {
+  color: var(--text-muted);
+  cursor: default;
+  font-size: 15px;
 }
 
-/* --- Content --- */
+/* ------------------------------------------------------------------ Content */
 .content {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
 }
 .editor-wrap {
-  padding: 20px 28px;
-  max-width: 1100px;
+  padding: 0 0 48px;
+}
+
+/* Top bar */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 28px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 .doc-title {
-  margin: 0 0 12px;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin: 0;
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: #16a34a;
+  flex: none;
+}
+.saved-check {
+  font-size: 11px;
+}
+.btn-share {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition: background 0.12s ease, box-shadow 0.12s ease;
+}
+.btn-share:hover {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Annotate toolbar */
+.annotate-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 28px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+.annotate-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.color-dots {
+  display: flex;
+  gap: 8px;
+}
+.color-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.color-dot:hover:not(:disabled) {
+  transform: scale(1.18);
+  box-shadow: var(--shadow-sm);
+}
+.color-dot:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.color-dot.annotation-lavender {
+  background: #b3a9f4;
+}
+.color-dot.annotation-yellow {
+  background: #ffd24a;
+}
+.color-dot.annotation-green {
+  background: #5fd39a;
+}
+.color-dot.annotation-pink {
+  background: #ff8fab;
+}
+.annotate-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* Editor + side notes */
+.editor-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 20px 28px 0;
+}
+.editor-main {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+}
+
+/* Strip Remirror's default editor chrome (border/box) for a clean page, and
+   set comfortable reading typography with serif headings (per the mock). */
+.editor-main .remirror-editor-wrapper {
+  padding: 0;
+}
+.editor-main .ProseMirror.remirror-editor {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  min-height: 60vh;
+  outline: none;
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--text-h);
+}
+/* Remirror's theme hard-codes a dark heading color that's invisible in dark
+   mode; force our themed token (correct in both schemes). */
+.editor-main .ProseMirror h1,
+.editor-main .ProseMirror h2,
+.editor-main .ProseMirror h3,
+.editor-main .ProseMirror h4 {
+  color: var(--text-h);
+}
+.editor-main .ProseMirror h1 {
+  font-family: var(--heading);
+  font-size: 34px;
+  line-height: 1.18;
+  letter-spacing: -0.5px;
+  margin: 6px 0 14px;
+}
+.editor-main .ProseMirror h2 {
+  font-family: var(--heading);
+  font-size: 23px;
+  margin: 24px 0 8px;
+}
+.editor-main .ProseMirror h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 18px 0 6px;
+}
+.editor-main .ProseMirror p {
+  margin: 11px 0;
+}
+.editor-main .ProseMirror blockquote {
+  border-left: 3px solid var(--border-strong);
+  margin: 12px 0;
+  padding: 2px 0 2px 16px;
+  color: var(--text);
+}
+
+/* ----------------------------------------------------------- Side notes rail */
+.side-notes {
+  flex: 0 0 340px;
+  width: 340px;
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+  position: relative;
+  align-self: stretch;
+}
+.side-notes-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.side-notes-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.side-notes-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 20px;
+  padding: 1px 8px;
+}
+.side-notes-empty {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.note-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.note {
+  position: absolute;
+  left: 20px;
+  right: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+  transition: top 0.18s ease, box-shadow 0.12s ease;
+}
+.note:hover {
+  box-shadow: var(--shadow);
+}
+/* A slim color tab on the card edge keys it to the highlight color. */
+.note::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+  opacity: 0.5;
+}
+.note.annotation-lavender::before {
+  background: #8b7ff0;
+}
+.note.annotation-yellow::before {
+  background: #f5b800;
+}
+.note.annotation-green::before {
+  background: #21b378;
+}
+.note.annotation-pink::before {
+  background: #f25c84;
+}
+
+.note-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.note-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.note-avatar.sm {
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+}
+.note-author {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.note-time {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.note-remove {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+.note-remove:hover {
+  background: var(--surface-2);
+  color: #e5484d;
+}
+
+.note-quote {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 9px 0 0;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-style: italic;
+  line-height: 1.45;
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-quote:hover {
+  color: var(--text-h);
+  outline: 1px solid var(--accent-border);
+}
+
+.note-type {
+  display: inline-flex;
+  margin: 10px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.note-type-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 11px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.note-type-btn + .note-type-btn {
+  border-left: 1px solid var(--border);
+}
+.note-type-btn.active {
+  background: var(--bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+.note-type-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.note-text {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-h);
+  resize: vertical;
+}
+.note-text:focus {
+  outline: none;
+  border-color: var(--accent-border);
+}
+
+.note-thread {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.note-thread-item {
+  display: flex;
+  gap: 8px;
+}
+.note-thread-body {
+  min-width: 0;
+}
+.note-thread-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.note-thread-text {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.note-reply {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.note-reply input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  background: var(--surface);
+  color: var(--text-h);
+}
+.note-reply input:focus {
+  outline: none;
+  border-color: var(--accent-border);
+  background: var(--bg);
+}
+.note-reply-send {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+.note-reply-send:hover {
+  background: var(--accent-strong);
+}
+
+/* ---------------------------------------------------------------- Empty state */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -145,88 +687,10 @@
 }
 .empty-state button {
   padding: 8px 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent-border);
   border-radius: 8px;
   background: var(--accent-bg);
   color: var(--accent);
   cursor: pointer;
   font-size: 15px;
-}
-
-/* --- Annotate toolbar --- */
-.annotate-bar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.annotate-bar button {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--text-h);
-  cursor: pointer;
-  font-size: 13px;
-}
-.annotate-bar button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.hint {
-  font-size: 13px;
-  color: var(--text);
-}
-
-/* --- Editor + side notes --- */
-.editor-row {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-.editor-main {
-  flex: 2;
-  min-width: 0;
-}
-.side-notes {
-  flex: 1;
-  min-width: 240px;
-  max-width: 320px;
-  border-left: 1px solid var(--border);
-  padding-left: 12px;
-}
-.side-notes-head {
-  font-size: 13px;
-  color: var(--text-h);
-}
-.note-list {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0;
-}
-.note {
-  padding: 8px;
-  margin-bottom: 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-}
-.note-quote {
-  font-size: 12px;
-  color: var(--text);
-  font-style: italic;
-  margin-bottom: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.note textarea {
-  width: 100%;
-  box-sizing: border-box;
-  font-size: 13px;
-}
-.note-remove {
-  margin-top: 4px;
-  font-size: 12px;
-  cursor: pointer;
 }
